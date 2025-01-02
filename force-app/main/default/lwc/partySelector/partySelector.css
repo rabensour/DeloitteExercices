@@ -1,0 +1,41 @@
+.party-card {
+    border: 2px solid #d8dde6;
+    border-radius: 0.25rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    cursor: pointer;
+    background-color: #ffffff;
+    outline: none; 
+}
+
+.party-card:hover {
+    background-color: #e8f4ff;
+    transform: scale(1.03);
+    border-color: #0070d2;
+}
+
+.party-card:focus,
+.party-card:active {
+    border-color: #0070d2;
+    box-shadow: 0 0 8px rgba(0, 112, 210, 0.8);
+    background-color: #e8f4ff;
+}
+
+.wide-button {
+    width: 50%; 
+    text-align: center;
+    display: block;
+    margin: 0 auto; 
+}
+
+.left-button {
+    margin-left: 0; 
+}
+
+.slds-m-top_small {
+    margin-top: 1rem; 
+}
+
+.slds-text-heading_large {
+    margin-bottom: 1rem; 
+}

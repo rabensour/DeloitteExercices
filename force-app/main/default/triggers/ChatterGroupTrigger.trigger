@@ -1,68 +1,72 @@
 trigger ChatterGroupTrigger on CollaborationGroupMember (after insert, after delete) {
+    
+    List<ChatterGroupEvent__e> events = new List<ChatterGroupEvent__e>();
 
-    // Liste pour collecter les événements à publier
-    List<ChatterGroupEvent__e> eventsToPublish = new List<ChatterGroupEvent__e>();
+    System.debug('Trigger Context: ' + (Trigger.isInsert ? 'Insert' : Trigger.isDelete ? 'Delete' : 'Unknown'));
 
-    // Récupérer les IDs des groupes Chatter référencés
-    Set<Id> groupIds = new Set<Id>();
+    // Handling Insert Events
     if (Trigger.isInsert) {
-        for (CollaborationGroupMember cgm : Trigger.new) {
-            groupIds.add(cgm.CollaborationGroupId);
-        }
-    } else if (Trigger.isDelete) {
-        for (CollaborationGroupMember cgm : Trigger.old) {
-            groupIds.add(cgm.CollaborationGroupId);
+        System.debug('Processing Inserted Records: ' + Trigger.new);
+        for (CollaborationGroupMember member : Trigger.new) {
+            try {
+                String chatterGroupName = [
+                    SELECT Name FROM CollaborationGroup WHERE Id = :member.CollaborationGroupId LIMIT 1
+                ].Name;
+                System.debug('Chatter Group Name Retrieved: ' + chatterGroupName);
+
+                ChatterGroupEvent__e event = new ChatterGroupEvent__e(
+                    Action__c = 'add',
+                    ChatterGroupName__c = chatterGroupName,
+                    UserId__c = member.MemberId
+                );
+
+                events.add(event);
+                System.debug('Event Prepared for Add: ' + event);
+            } catch (Exception e) {
+                System.debug('Error while processing insert for member: ' + member + '. Error: ' + e.getMessage());
+            }
         }
     }
 
-    System.debug('Group IDs collected: ' + groupIds);
-
-    // Charger les détails des groupes Chatter à partir de leurs IDs
-    Map<Id, CollaborationGroup> groupMap = new Map<Id, CollaborationGroup>(
-        [SELECT Id, Name FROM CollaborationGroup WHERE Id IN :groupIds]
-    );
-
-    System.debug('CollaborationGroup Map: ' + groupMap);
-
-    // Gestion des insertions
-    if (Trigger.isInsert) {
-        System.debug('Processing Trigger.isInsert...');
-        for (CollaborationGroupMember cgm : Trigger.new) {
-            String groupName = groupMap.get(cgm.CollaborationGroupId)?.Name;
-            System.debug('Processing new CollaborationGroupMember: ' + cgm.Id);
-            System.debug('Group Name: ' + groupName);
-            System.debug('User ID: ' + cgm.MemberId);
-
-            eventsToPublish.add(new ChatterGroupEvent__e(
-                Action__c = 'Add',
-                ChatterGroupName__c = groupName,
-                UserId__c = cgm.MemberId
-            ));
-        }
-    }
-
-    // Gestion des suppressions
+    // Handling Delete Events
     if (Trigger.isDelete) {
-        System.debug('Processing Trigger.isDelete...');
-        for (CollaborationGroupMember cgm : Trigger.old) {
-            String groupName = groupMap.get(cgm.CollaborationGroupId)?.Name;
-            System.debug('Processing deleted CollaborationGroupMember: ' + cgm.Id);
-            System.debug('Group Name: ' + groupName);
-            System.debug('User ID: ' + cgm.MemberId);
+        System.debug('Processing Deleted Records: ' + Trigger.old);
+        for (CollaborationGroupMember member : Trigger.old) {
+            try {
+                String chatterGroupName = [
+                    SELECT Name FROM CollaborationGroup WHERE Id = :member.CollaborationGroupId LIMIT 1
+                ].Name;
+                System.debug('Chatter Group Name Retrieved: ' + chatterGroupName);
 
-            eventsToPublish.add(new ChatterGroupEvent__e(
-                Action__c = 'Remove',
-                ChatterGroupName__c = groupName,
-                UserId__c = cgm.MemberId
-            ));
+                ChatterGroupEvent__e event = new ChatterGroupEvent__e(
+                    Action__c = 'remove',
+                    ChatterGroupName__c = chatterGroupName,
+                    UserId__c = member.MemberId
+                );
+
+                events.add(event);
+                System.debug('Event Prepared for Remove: ' + event);
+            } catch (Exception e) {
+                System.debug('Error while processing delete for member: ' + member + '. Error: ' + e.getMessage());
+            }
         }
     }
 
-    // Publier les événements Platform Event
-    if (!eventsToPublish.isEmpty()) {
-        System.debug('Publishing events: ' + eventsToPublish);
-        EventBus.publish(eventsToPublish);
-    } else {
-        System.debug('No events to publish.');
+    // Publishing Events
+    if (!events.isEmpty()) {
+        try {
+            List<Database.SaveResult> results = EventBus.publish(events);
+            for(Database.SaveResult sr : results) {
+                if (sr.isSuccess()) {
+                    System.debug('Successfully published event. Event ID: ' + sr.getId());
+                } else {
+                    for(Database.Error err : sr.getErrors()) {
+                        System.debug('Error publishing event: ' + err.getStatusCode() + ': ' + err.getMessage());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.debug('Error while publishing events: ' + e.getMessage() + '\n' + e.getStackTraceString());
+        }
     }
 }

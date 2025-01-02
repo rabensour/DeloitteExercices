@@ -1,0 +1,41 @@
+<template>
+    <lightning-card title="Election">
+        <div class="slds-text-align_center slds-m-bottom_medium">
+            <template if:true={userName}>
+                <h1 class="slds-text-heading_medium">Welcome, {userName}</h1>
+            </template>
+            <h2 class="slds-text-heading_medium slds-m-top_medium">Choose Your Party</h2>
+        </div>
+
+        <template if:true={parties}>
+            <div class="slds-grid slds-wrap slds-p-around_medium slds-grid_align-center">
+                <template for:each={parties} for:item="party">
+                    <div key={party.Id} class="slds-col slds-size_1-of-4 slds-m-around_small" data-id={party.Id}
+                        data-selected="false" onclick={selectParty}>
+                        <lightning-card>
+                            <div class="slds-text-align_center slds-p-around_small party-card">
+                                <h3 class="slds-text-heading_small">{party.PartyCode__c}</h3>
+                                <p>{party.Description__c}</p>
+                            </div>
+                        </lightning-card>
+                    </div>
+                </template>
+            </div>
+
+            <div class="slds-grid slds-grid_align-spread slds-m-top_medium">
+                <div class="slds-col slds-size_1-of-4 slds-m-left_medium">
+                    <lightning-button label="Add New Party" onclick={togglePartyForm} variant="neutral"
+                        class="left-button"></lightning-button>
+                </div>
+            </div>
+            <div class="slds-col slds-align_absolute-center">
+                <lightning-button label="Save Selection" onclick={saveSelection} variant="brand"
+                    class="wide-button"></lightning-button>
+            </div>
+        </template>
+
+        <template if:false={parties}>
+            <p class="slds-text-align_center slds-m-top_large">No parties available. Please add one.</p>
+        </template>
+    </lightning-card>
+</template>
