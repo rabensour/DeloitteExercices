@@ -58,6 +58,7 @@ export default class ElectionApp extends LightningElement {
     // Show/Hide the new party form
     togglePartyForm() {
         this.showPartyForm = !this.showPartyForm;
+        console.log('showPartyForm', showPartyForm);
     }
 
     // Handle input changes for the new party form

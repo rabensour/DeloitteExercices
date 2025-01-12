@@ -1,114 +1,82 @@
 public class ChatterGroupHandler {
-    public static void handlePlatformEvents(List<ChatterGroupEvent__e> events) {
+    public static void handleInsert(List<CollaborationGroupMember> newMembers) {
+        List<ChatterGroupEvent__e> events = new List<ChatterGroupEvent__e>();
 
-        System.debug('Events received: ' + events);
+        System.debug('Handling insert operation in ChatterGroupHandler.');
 
-        // Prepare lists for DML operations
-        List<Group> groupsToCreate = new List<Group>();
-        List<GroupMember> groupMembersToAdd = new List<GroupMember>();
-        List<GroupMember> groupMembersToDelete = new List<GroupMember>();
+        for (CollaborationGroupMember member : newMembers) {
+            try {
+                String chatterGroupName = [
+                    SELECT Name FROM CollaborationGroup WHERE Id = :member.CollaborationGroupId LIMIT 1
+                ].Name;
 
-        // Retrieve unique group names
-        Set<String> chatterGroupNames = new Set<String>();
-        for (ChatterGroupEvent__e event : events) {
-                chatterGroupNames.add(event.ChatterGroupName__c);
-        }
-        System.debug('Unique Chatter Group Names: ' + chatterGroupNames);
+                System.debug('Chatter Group Name Retrieved: ' + chatterGroupName);
 
-        // Retrieve existing public groups
-        Map<String, Group> existingGroups = new Map<String, Group>();
-        try {
-            for (group g :[SELECT Id, name FROM Group WHERE name IN :chatterGroupNames]) {
-                if (!existingGroups.containsKey(g.name)) {
-                    existingGroups.put(g.name, g);
-                }
-            }
-        } catch (Exception e) {
-            System.debug('Error fetching existing groups: ' + e.getMessage());
-        }
-
-        System.debug('Existing Groups Retrieved: ' + existingGroups);
-
-        // Create missing groups
-        for (ChatterGroupEvent__e event : events) {
-            String groupName = event.ChatterGroupName__c;
-            String action = event.Action__c;
-
-            if (!existingGroups.containsKey(groupName) && action == 'add') {
-                Group newGroup = new Group(
-                    Name = groupName,
-                    Type = 'Regular'
+                ChatterGroupEvent__e event = new ChatterGroupEvent__e(
+                    Action__c = 'add',
+                    ChatterGroupName__c = chatterGroupName,
+                    UserId__c = member.MemberId
                 );
-                System.debug('Creating new group : ' + groupName);
-                groupsToCreate.add(newGroup);
-                existingGroups.put(groupName, newGroup); 
+
+                events.add(event);
+                System.debug('Event Prepared for Add: ' + event);
+            } catch (Exception e) {
+                System.debug('Error while processing insert for member: ' + member + '. Error: ' + e.getMessage());
             }
         }
 
-        try {
-            // Insert new public groups
-            if (!groupsToCreate.isEmpty()) {
-                System.debug('Inserting new groups: ' + groupsToCreate);
-                insert groupsToCreate;
+        publishEvents(events);
+    }
 
-                // Update created groups with IDs after insertion
-                for (Group createdGroup : groupsToCreate) {
-                    existingGroups.put(createdGroup.name, createdGroup);
-                }
+    public static void handleDelete(List<CollaborationGroupMember> oldMembers) {
+        List<ChatterGroupEvent__e> events = new List<ChatterGroupEvent__e>();
+
+        System.debug('Handling delete operation in ChatterGroupHandler.');
+
+        for (CollaborationGroupMember member : oldMembers) {
+            try {
+                String chatterGroupName = [
+                    SELECT Name FROM CollaborationGroup WHERE Id = :member.CollaborationGroupId LIMIT 1
+                ].Name;
+
+                System.debug('Chatter Group Name Retrieved: ' + chatterGroupName);
+
+                ChatterGroupEvent__e event = new ChatterGroupEvent__e(
+                    Action__c = 'remove',
+                    ChatterGroupName__c = chatterGroupName,
+                    UserId__c = member.MemberId
+                );
+
+                events.add(event);
+                System.debug('Event Prepared for Remove: ' + event);
+            } catch (Exception e) {
+                System.debug('Error while processing delete for member: ' + member + '. Error: ' + e.getMessage());
             }
+        }
 
-            // Process the events
-            for (ChatterGroupEvent__e event : events) {
-                String action = event.Action__c;
-                String groupName = event.ChatterGroupName__c;
-                String userId = event.UserId__c;
+        publishEvents(events);
+    }
 
-                System.debug('Processing event: Action=' + action + ', ChatterGroupName=' + groupName + ', UserId=' + userId);
+    private static void publishEvents(List<ChatterGroupEvent__e> events) {
+        if (!events.isEmpty()) {
+            System.debug('Publishing events: ' + events);
+            try {
+                List<Database.SaveResult> results = EventBus.publish(events);
 
-                Group publicGroup = existingGroups.get(groupName);
-                if (action == 'add') {
-                    if (publicGroup != null) {
-                        System.debug('Adding member to group: ' + publicGroup.Id + ', UserId: ' + userId);
-                        groupMembersToAdd.add(new GroupMember(
-                            GroupId = publicGroup.Id,
-                            UserOrGroupId = userId
-                        ));
+                for (Database.SaveResult sr : results) {
+                    if (sr.isSuccess()) {
+                        System.debug('Successfully published event. Event ID: ' + sr.getId());
                     } else {
-                        System.debug('Public Group not found for adding member: ' + groupName);
-                    }
-                } else if (action == 'remove') {
-                    if (publicGroup != null) {
-                        try {
-                            GroupMember memberToDelete = [
-                                SELECT Id FROM GroupMember 
-                                WHERE GroupId = :publicGroup.Id AND UserOrGroupId = :userId 
-                                LIMIT 1
-                            ];
-                            System.debug('Found member to delete: ' + memberToDelete.Id);
-                            groupMembersToDelete.add(memberToDelete);
-                        } catch (Exception e) {
-                            System.debug('Error finding Group Member to delete: ' + e.getMessage());
+                        for (Database.Error err : sr.getErrors()) {
+                            System.debug('Error publishing event: ' + err.getStatusCode() + ': ' + err.getMessage());
                         }
-                    } else {
-                        System.debug('Public Group not found for removing member: ' + groupName);
                     }
                 }
+            } catch (Exception e) {
+                System.debug('Error while publishing events: ' + e.getMessage());
             }
-
-            // Execute DML operations
-            if (!groupMembersToAdd.isEmpty()) {
-                System.debug('Inserting new Group Members: ' + groupMembersToAdd);
-                insert groupMembersToAdd;
-            }
-            if (!groupMembersToDelete.isEmpty()) {
-                System.debug('Deleting Group Members: ' + groupMembersToDelete);
-                delete groupMembersToDelete;
-            }
-        } catch (DmlException e) {
-            System.debug('DML Exception occurred: ' + e.getMessage());
-            for (Integer i = 0; i < e.getNumDml(); i++) {
-                System.debug('DML Error on record ' + e.getDmlId(i) + ': ' + e.getDmlMessage(i));
-            }
+        } else {
+            System.debug('No events to publish.');
         }
     }
 }

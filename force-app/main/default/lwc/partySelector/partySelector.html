@@ -28,6 +28,23 @@
                         class="left-button"></lightning-button>
                 </div>
             </div>
+            <template if:true={showPartyForm}>
+                <div class="slds-p-around_medium">
+                    <lightning-input label="Party Name" value={newPartyName} name="newPartyName"
+                        onchange={handleInputChange}></lightning-input>
+                    <lightning-input label="Party Code" value={newPartyCode} name="newPartyCode"
+                        onchange={handleInputChange}></lightning-input>
+                    <lightning-input label="Description" value={newPartyDescription} name="newPartyDescription"
+                        onchange={handleInputChange}></lightning-input>
+                    <lightning-input label="Leader" value={newPartyLeader} name="newPartyLeader"
+                        onchange={handleInputChange}></lightning-input>
+                    <div class="slds-m-top_medium">
+                        <lightning-button label="Save Party" onclick={saveNewParty} variant="brand"
+                            class="slds-m-right_small"></lightning-button>
+                        <lightning-button label="Cancel" onclick={togglePartyForm} variant="neutral"></lightning-button>
+                    </div>
+                </div>
+            </template>
             <div class="slds-col slds-align_absolute-center">
                 <lightning-button label="Save Selection" onclick={saveSelection} variant="brand"
                     class="wide-button"></lightning-button>

@@ -12,7 +12,7 @@ trigger ChatterGroupEventTrigger on ChatterGroupEvent__e (after insert) {
 
     // Pass the events to the handler class for processing
     try {
-        ChatterGroupHandler.handlePlatformEvents(Trigger.new);
+        ChatterGroupEventHandler.handlePlatformEvents(Trigger.new);
     } catch (Exception e) {
         System.debug('Error in ChatterGroupEventTrigger: ' + e.getMessage());
     }
